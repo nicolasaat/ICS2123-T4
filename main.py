@@ -130,7 +130,7 @@ def print_overallresults(results: list):
     print(f"Lograron votar: {np.average(voted_data)}")
     print(f"Overtime: {np.average(overtime_data)}")
     
-def simulate(C = 10, K = 70):
+def simulate(C = 4, K = 70):
     #print_header(C, K)
     time_elapsed = 0
     arrivals = 0
