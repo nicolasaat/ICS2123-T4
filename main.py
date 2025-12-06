@@ -4,6 +4,19 @@ from parameters import *
 
 GENERATOR = np.random.default_rng(seed=SEED)
 
+class Voter():
+    def __init__(self, type:int, arrival_time = None, booth_time = None, exit_time = None):
+        self.type = type
+        self.arrival_time = arrival_time
+        self.booth_time = booth_time
+        self.exit_time = exit_time
+
+    def get_time_in_queue(self):
+        return self.booth_time - self.arrival_time
+    
+    def get_time_in_system(self):
+        return self.exit_time - self.arrival_time
+
 def get_current_block(time: int) -> int:
     '''
     Retorna el numero del bloque dependiendo el tiempo
@@ -54,11 +67,11 @@ def generate_voters(size: int, time_elapsed: int):
     for _ in range(size):
         random = GENERATOR.random()
         if random <= probabilities[0]:
-            group.append(0)
+            group.append(Voter(0, time_elapsed))
         elif random <= probabilities[0]+probabilities[1]:
-            group.append(1)
+            group.append(Voter(1, time_elapsed))
         else:
-            group.append(2)
+            group.append(Voter(2, time_elapsed))
     return group
 
 
@@ -74,25 +87,30 @@ def get_sorted_queue(unsorted_queue: list):
     Se ordena la cola segun prioridad por el tipo de votante. Donde los de
     tipo 2 quedan al principio y luego el resto sigue orden FIFO
     '''
-    prioritized = list(filter(lambda x: x==2, unsorted_queue))
-    unprioritized = list(filter(lambda x: x!=2, unsorted_queue))
+    prioritized = list(filter(lambda x: x.type==2, unsorted_queue))
+    unprioritized = list(filter(lambda x: x.type!=2, unsorted_queue))
 
     return prioritized + unprioritized
 
-def fill_empty_booths(booths: dict, queue: list, events: list, time_elapsed: int):
+def fill_empty_booths(booths: dict, queue: list, events: list, time_elapsed: int,
+                      time_in_queue: dict, time_in_system: dict):
     '''
     Se llenan las cabinas vacias siempre que haya al menos un votante en la cola.
     Además, cuando entra un nuevo votante se calcula su tiempo de salida segun una
     distribucion Triangular(l,m,r), la que se agrega a los eventos
     '''
     empty_booths = list(filter(lambda x: x[1] == 0, booths.items()))
+    block = get_current_block(time_elapsed)
     for booth_number, booth_state in empty_booths:
         if len(queue)>0:
             next_voter = queue.pop(0)
             booths[booth_number] = 1
-            left, mode, right = TRI[next_voter]
-            next_voter_exit = time_elapsed + GENERATOR.triangular(left, mode, right)
-            events.append((next_voter_exit, "exit"))
+            left, mode, right = TRI[next_voter.type]
+            next_voter.booth_time = time_elapsed
+            next_voter.exit_time = time_elapsed + GENERATOR.triangular(left, mode, right)
+            time_in_queue[block].append(next_voter.get_time_in_queue())
+            time_in_system[block].append(next_voter.get_time_in_system())
+            events.append((next_voter.exit_time, "exit"))
         else:
             break
     events.sort(key=lambda x: x[0])
@@ -107,30 +125,39 @@ def process_exit(booths: dict):
                 booths[booth_number] = 0
                 break
 
-def print_results(arrivals, rejected, voted):
+def print_results(arrivals, rejected, voted, queue_time, system_time):
     print(f"Entraron a la cola: {round(arrivals,3)}")
     print(f"Lograron votar: {round(voted, 3)}")
     print(f"Rechazados para la cola: {round(rejected, 3)}")
+    print(f"Tiempo promedio de espera en cola: {round(queue_time, 3)}")
+    print(f"Tiempo promedio en sistema: {round(system_time, 3)}")
 
 def print_overallresults(results: list):
     total_arrivals = 0
     total_rejected = 0
     total_voted = 0
+    total_queue_time = []
+    total_system_time = []
     for block in range(1,5):
         arrivals_data = list(map(lambda x: x[0][block], results))
         rejected_data = list(map(lambda x: x[1][block], results))
         voted_data = list(map(lambda x: x[2][block], results))
+        queue_time_data = list(map(lambda x: x[4][block], results))
+        system_time_data = list(map(lambda x: x[5][block], results))
         total_arrivals += np.average(arrivals_data)
         total_rejected += np.average(rejected_data)
         total_voted += np.average(voted_data)
+        total_queue_time +=  (queue_time_data)
+        total_system_time +=  (system_time_data)
         print(f"Bloque {block}:")
         print_results(np.average(arrivals_data), np.average(rejected_data), 
-                      np.average(voted_data))
+                      np.average(voted_data), np.average(queue_time_data),
+                      np.average(system_time_data))
         print()
         
     print("Global:")
     print_results(total_arrivals, total_rejected, 
-                total_voted)
+                total_voted, np.average(total_queue_time), np.average(total_system_time))
     overtime_data = list(map(lambda x: x[3], results))
     print(f"Overtime: {round(np.average(overtime_data),3)}")
     
@@ -139,6 +166,8 @@ def simulate(C = 4, K = 70):
     arrivals = {1: 0, 2: 0, 3:0 , 4:0}
     voted = {1: 0, 2: 0, 3:0 , 4:0}
     rejected = {1: 0, 2: 0, 3:0 , 4:0}
+    time_in_queue = {1: [], 2: [], 3:[], 4:[]}
+    time_in_system = {1: [], 2: [], 3:[], 4:[]}
 
     queue = []
     booths = {i: 0 for i in range(1, C+1)}
@@ -162,9 +191,14 @@ def simulate(C = 4, K = 70):
             process_exit(booths)
             voted[block] += 1
         queue = get_sorted_queue(queue)
-        fill_empty_booths(booths, queue, events, time_elapsed)
+        fill_empty_booths(booths, queue, events, time_elapsed, time_in_queue, time_in_system)
+
         queue = get_sorted_queue(queue)
-    return arrivals, rejected, voted, round(over_time, 3)
+    for key, value in time_in_queue.items():
+        time_in_queue[key] = np.average(value)
+    for key, value in time_in_system.items():
+        time_in_system[key] = np.average(value)
+    return arrivals, rejected, voted, round(over_time, 3), time_in_queue, time_in_system
 
 
 results = []
