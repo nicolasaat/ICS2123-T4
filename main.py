@@ -107,35 +107,38 @@ def process_exit(booths: dict):
                 booths[booth_number] = 0
                 break
 
-def print_header(C, K):
-    print("="*30)
-    print(f"SIMULACIÓN (C={C}, K={K})")
-    print("="*30)
-
-def print_results(arrivals, rejected, voted, over_time):
-    print(f"Entraron a la cola: {arrivals}")
-    print(f"Rechazados para la cola: {rejected}")
-    print(f"Lograron votar: {voted}")
-    print(f"Overtime: {over_time}")
-    print()
+def print_results(arrivals, rejected, voted):
+    print(f"Entraron a la cola: {round(arrivals,3)}")
+    print(f"Lograron votar: {round(voted, 3)}")
+    print(f"Rechazados para la cola: {round(rejected, 3)}")
 
 def print_overallresults(results: list):
-    arrivals_data = list(map(lambda x: x[0], results))
-    rejected_data = list(map(lambda x: x[1], results))
-    voted_data = list(map(lambda x: x[2], results))
+    total_arrivals = 0
+    total_rejected = 0
+    total_voted = 0
+    for block in range(1,5):
+        arrivals_data = list(map(lambda x: x[0][block], results))
+        rejected_data = list(map(lambda x: x[1][block], results))
+        voted_data = list(map(lambda x: x[2][block], results))
+        total_arrivals += np.average(arrivals_data)
+        total_rejected += np.average(rejected_data)
+        total_voted += np.average(voted_data)
+        print(f"Bloque {block}:")
+        print_results(np.average(arrivals_data), np.average(rejected_data), 
+                      np.average(voted_data))
+        print()
+        
+    print("Global:")
+    print_results(total_arrivals, total_rejected, 
+                total_voted)
     overtime_data = list(map(lambda x: x[3], results))
-    print("PROMEDIO:")
-    print(f"Entraron a la cola: {np.average(arrivals_data)}")
-    print(f"Rechazados para la cola: {np.average(rejected_data)}")
-    print(f"Lograron votar: {np.average(voted_data)}")
-    print(f"Overtime: {np.average(overtime_data)}")
+    print(f"Overtime: {round(np.average(overtime_data),3)}")
     
 def simulate(C = 4, K = 70):
-    #print_header(C, K)
     time_elapsed = 0
-    arrivals = 0
-    voted = 0
-    rejected = 0
+    arrivals = {1: 0, 2: 0, 3:0 , 4:0}
+    voted = {1: 0, 2: 0, 3:0 , 4:0}
+    rejected = {1: 0, 2: 0, 3:0 , 4:0}
 
     queue = []
     booths = {i: 0 for i in range(1, C+1)}
@@ -144,19 +147,20 @@ def simulate(C = 4, K = 70):
     while len(events) > 0:
         event = events.pop(0)
         time_elapsed = event[0]
+        block = get_current_block(time_elapsed)
         if event[1] == "arrival":
             before = len(queue)
             size = get_group_size(time_elapsed)
             process_arrival(queue, K - C, time_elapsed, size)
             after = len(queue)
             if after - before > 0:
-                arrivals += size
+                arrivals[block] += size
             else:
-                rejected += size
+                rejected[block] += size
         else:
             over_time = max(0, time_elapsed - TIME_LIMIT)
             process_exit(booths)
-            voted += 1
+            voted[block] += 1
         queue = get_sorted_queue(queue)
         fill_empty_booths(booths, queue, events, time_elapsed)
         queue = get_sorted_queue(queue)
@@ -168,8 +172,6 @@ results = []
 for _ in range(300):
     result = simulate()
     results.append(result)
-    #print_results(*result)
 print_overallresults(results)
-
 
 
