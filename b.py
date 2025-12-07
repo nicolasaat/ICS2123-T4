@@ -1,4 +1,5 @@
-from simulation import *
+from simulation import simulate
+import numpy as np
 
 def print_overallresults(results: list):
     total_arrivals = 0
