@@ -132,6 +132,7 @@ def simulate(C = 4, K = 70):
     rejected = {1: 0, 2: 0, 3:0 , 4:0}
     time_in_queue = {1: [], 2: [], 3:[], 4:[]}
     time_in_system = {1: [], 2: [], 3:[], 4:[]}
+    max_queue = {1: 0, 2: 0, 3:0 , 4:0}
     voters_at_closing_time = 0
 
     queue = []
@@ -159,10 +160,13 @@ def simulate(C = 4, K = 70):
             voted[block] += 1
         queue = get_sorted_queue(queue)
         fill_empty_booths(booths, queue, events, time_elapsed, time_in_queue, time_in_system)
-
         queue = get_sorted_queue(queue)
+
+        max_queue[block] = max(max_queue[block], len(queue))
+
+        
     for key, value in time_in_queue.items():
         time_in_queue[key] = np.average(value)
     for key, value in time_in_system.items():
         time_in_system[key] = np.average(value)
-    return arrivals, rejected, voted, round(over_time, 3), time_in_queue, time_in_system, voters_at_closing_time
+    return arrivals, rejected, voted, round(over_time, 3), time_in_queue, time_in_system, voters_at_closing_time, max_queue
