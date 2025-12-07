@@ -10,3 +10,5 @@ TYPE_PROB = {1: (0.45, 0.45, 0.1), 2: (0.3, 0.5, 0.2), 3: (0.28, 0.5, 0.22), 4: 
 SEED = 2123
 
 TIME_LIMIT = 600
+
+INFINITY = 10**6 #Suficientemente grande como para nunca llenar cola
