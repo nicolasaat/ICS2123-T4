@@ -124,42 +124,6 @@ def process_exit(booths: dict):
             if booth_state == 1:
                 booths[booth_number] = 0
                 break
-
-def print_results(arrivals, rejected, voted, queue_time, system_time):
-    print(f"Entraron a la cola: {round(arrivals,3)}")
-    print(f"Lograron votar: {round(voted, 3)}")
-    print(f"Rechazados para la cola: {round(rejected, 3)}")
-    print(f"Tiempo promedio de espera en cola: {round(queue_time, 3)}")
-    print(f"Tiempo promedio en sistema: {round(system_time, 3)}")
-
-def print_overallresults(results: list):
-    total_arrivals = 0
-    total_rejected = 0
-    total_voted = 0
-    total_queue_time = []
-    total_system_time = []
-    for block in range(1,5):
-        arrivals_data = list(map(lambda x: x[0][block], results))
-        rejected_data = list(map(lambda x: x[1][block], results))
-        voted_data = list(map(lambda x: x[2][block], results))
-        queue_time_data = list(map(lambda x: x[4][block], results))
-        system_time_data = list(map(lambda x: x[5][block], results))
-        total_arrivals += np.average(arrivals_data)
-        total_rejected += np.average(rejected_data)
-        total_voted += np.average(voted_data)
-        total_queue_time +=  (queue_time_data)
-        total_system_time +=  (system_time_data)
-        print(f"Bloque {block}:")
-        print_results(np.average(arrivals_data), np.average(rejected_data), 
-                      np.average(voted_data), np.average(queue_time_data),
-                      np.average(system_time_data))
-        print()
-        
-    print("Global:")
-    print_results(total_arrivals, total_rejected, 
-                total_voted, np.average(total_queue_time), np.average(total_system_time))
-    overtime_data = list(map(lambda x: x[3], results))
-    print(f"Overtime: {round(np.average(overtime_data),3)}")
     
 def simulate(C = 4, K = 70):
     time_elapsed = 0
@@ -168,6 +132,7 @@ def simulate(C = 4, K = 70):
     rejected = {1: 0, 2: 0, 3:0 , 4:0}
     time_in_queue = {1: [], 2: [], 3:[], 4:[]}
     time_in_system = {1: [], 2: [], 3:[], 4:[]}
+    voters_at_closing_time = 0
 
     queue = []
     booths = {i: 0 for i in range(1, C+1)}
@@ -188,6 +153,8 @@ def simulate(C = 4, K = 70):
                 rejected[block] += size
         else:
             over_time = max(0, time_elapsed - TIME_LIMIT)
+            if (voters_at_closing_time == 0 and time_elapsed > TIME_LIMIT):
+                voters_at_closing_time = len(list(filter(lambda x: x[1] == 0, booths.items())))
             process_exit(booths)
             voted[block] += 1
         queue = get_sorted_queue(queue)
@@ -198,14 +165,4 @@ def simulate(C = 4, K = 70):
         time_in_queue[key] = np.average(value)
     for key, value in time_in_system.items():
         time_in_system[key] = np.average(value)
-    return arrivals, rejected, voted, round(over_time, 3), time_in_queue, time_in_system
-
-
-results = []
-
-for _ in range(300):
-    result = simulate()
-    results.append(result)
-print_overallresults(results)
-
-
+    return arrivals, rejected, voted, round(over_time, 3), time_in_queue, time_in_system, voters_at_closing_time
